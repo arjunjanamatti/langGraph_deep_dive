@@ -4,43 +4,43 @@ from langchain.schema.document import Document
 from datasets import load_dataset
 from config import input_variables
 
-# define the variables from config file
-CHROMA_PATH = input_variables.variables.CHROMA_PATH
-DATA_PATH = input_variables.variables.DATA_PATH
-DATASET_URL = input_variables.variables.DATASET_URL
-EMBEDDING_model = input_variables.variables.EMBEDDING_MODEL
-CHUNK_SIZE = input_variables.variables.CHUNK_SIZE
-CHUNK_OVERLAP = input_variables.variables.CHUNK_OVERLAP
+class helper:
+    def __init__(self) -> None:
+        # define the variables from config file
+        self.CHROMA_PATH = input_variables.variables.CHROMA_PATH
+        self.DATA_PATH = input_variables.variables.DATA_PATH
+        self.DATASET_URL = input_variables.variables.DATASET_URL
+        self.EMBEDDING_model = input_variables.variables.EMBEDDING_MODEL
+        self.CHUNK_SIZE = input_variables.variables.CHUNK_SIZE
+        self.CHUNK_OVERLAP = input_variables.variables.CHUNK_OVERLAP
 
+    def get_embedding_function(self):
+        embeddings = OllamaEmbeddings(model = self.EMBEDDING_model)
+        return embeddings
+    
+    def load_documents(self):
+        dataset = load_dataset(self.DATASET_URL, split="train")
+        return dataset
+    
+    def split_documents(self, documents: list[Document]):
+        # First, use semantic chunking
+        semantic_splitter = SemanticTextSplitter(
+            chunk_size = self.CHUNK_SIZE,
+            chunk_overlap = self.CHUNK_OVERLAP,
+            length_function = len,
+            is_separator_regex = False,
+        )
+        semantic_chunks = semantic_splitter.split_documents(documents)
 
-def get_embedding_function():
-    embeddings = OllamaEmbeddings(model = EMBEDDING_model)
-    return embeddings
+        # Then, use recursive chunking on the semantic chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size = self.CHUNK_SIZE,
+            chunk_overlap = self.CHUNK_OVERLAP,
+            length_function = len,
+            is_separator_regex = False,
+        )
+        final_chunks = []
+        for chunk in semantic_chunks:
+            final_chunks.extend(text_splitter.split_documents([chunk]))
 
-
-def load_documents():
-    dataset = load_dataset(DATASET_URL, split="train")
-    return dataset
-
-def split_documents(documents: list[Document]):
-    # First, use semantic chunking
-    semantic_splitter = SemanticTextSplitter(
-        chunk_size = CHUNK_SIZE,
-        chunk_overlap = CHUNK_OVERLAP,
-        length_function = len,
-        is_separator_regex = False,
-    )
-    semantic_chunks = semantic_splitter.split_documents(documents)
-
-    # Then, use recursive chunking on the semantic chunks
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size = CHUNK_SIZE,
-        chunk_overlap = CHUNK_OVERLAP,
-        length_function = len,
-        is_separator_regex = False,
-    )
-    final_chunks = []
-    for chunk in semantic_chunks:
-        final_chunks.extend(text_splitter.split_documents([chunk]))
-
-    return final_chunks
+        return final_chunks
