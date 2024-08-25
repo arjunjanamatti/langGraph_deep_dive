@@ -1,0 +1,15 @@
+from langchain_community.embeddings.ollama import OllamaEmbeddings
+from datasets import load_dataset
+from config import input_variables
+
+# define the variables from config file
+CHROMA_PATH = input_variables.variables.CHROMA_PATH
+
+def get_embedding_function():
+    embeddings = OllamaEmbeddings(model='nomic-embed-text')
+    return embeddings
+
+
+def load_documents():
+    dataset = load_dataset("jamescalam/ai-arxiv2-semantic-chunks", split="train")
+    return dataset
