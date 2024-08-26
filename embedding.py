@@ -3,14 +3,16 @@ import argparse
 import os, shutil
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
-from langchain.document_loaders.pdf import PyPDFDirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter, SemanticTextSplitter
+# from langchain.document_loaders.pdf import PyPDFDirectoryLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_experimental.text_splitter import SemanticChunker
 from langchain.schema.document import Document
-from langchain.vectorstores.chroma import Chroma
+from langchain_community.vectorstores import Chroma
 from config import input_variables
+from datasets import load_dataset
 
-class helper:
-    def __init__(self) -> None:
+class main:
+    def __init__(self,input_variables) -> None:
         # define the variables from config file
         self.CHROMA_PATH = input_variables.variables.CHROMA_PATH
         self.DATA_PATH = input_variables.variables.DATA_PATH
@@ -28,14 +30,16 @@ class helper:
         return dataset
     
     def split_documents(self, documents: list[Document]):
-        # First, use semantic chunking
-        semantic_splitter = SemanticTextSplitter(
-            chunk_size = self.CHUNK_SIZE,
-            chunk_overlap = self.CHUNK_OVERLAP,
-            length_function = len,
-            is_separator_regex = False,
-        )
-        semantic_chunks = semantic_splitter.split_documents(documents)
+        # # First, use semantic chunking
+        # semantic_splitter = SemanticTextSplitter(
+        #     chunk_size = self.CHUNK_SIZE,
+        #     chunk_overlap = self.CHUNK_OVERLAP,
+        #     length_function = len,
+        #     is_separator_regex = False,
+        # )
+
+        semantic_chunker = SemanticChunker(self.get_embedding_function())
+        semantic_chunks = semantic_chunker.split_documents(documents)
 
         # Then, use recursive chunking on the semantic chunks
         text_splitter = RecursiveCharacterTextSplitter(
@@ -50,4 +54,10 @@ class helper:
 
         return final_chunks
 
+# calling the main function
+main_class = main(input_variables)
 
+# loading the dataset
+dataset = main_class.load_documents()
+
+print(dataset)
