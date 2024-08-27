@@ -11,7 +11,14 @@ from langchain_community.vectorstores import Chroma
 from config import input_variables
 from datasets import load_dataset
 
-class main:
+class Embedder:
+    def __init__(self, input_variables):
+        self.embedder = OllamaEmbeddings(model=input_variables.variables.EMBEDDING_MODEL)
+
+    def embed_single_text(self, text):
+        return self.embedder._embed([text])[0]
+
+class create_embedding:
     def __init__(self,input_variables) -> None:
         # define the variables from config file
         self.CHROMA_PATH = input_variables.variables.CHROMA_PATH
@@ -29,35 +36,35 @@ class main:
         dataset = load_dataset(self.DATASET_URL, split="train")
         return dataset
     
-    def split_documents(self, documents: list[Document]):
-        # # First, use semantic chunking
-        # semantic_splitter = SemanticTextSplitter(
-        #     chunk_size = self.CHUNK_SIZE,
-        #     chunk_overlap = self.CHUNK_OVERLAP,
-        #     length_function = len,
-        #     is_separator_regex = False,
-        # )
+    def create_embeddings(self):
+        # Initialize the embedder
+        embedder = self.get_embedding_function()
 
-        semantic_chunker = SemanticChunker(self.get_embedding_function())
-        semantic_chunks = semantic_chunker.split_documents(documents)
+        # get dataset
+        dataset = self.load_documents()
 
-        # Then, use recursive chunking on the semantic chunks
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size = self.CHUNK_SIZE,
-            chunk_overlap = self.CHUNK_OVERLAP,
-            length_function = len,
-            is_separator_regex = False,
-        )
-        final_chunks = []
-        for chunk in semantic_chunks:
-            final_chunks.extend(text_splitter.split_documents([chunk]))
+        # Convert dataset to pandas dataframe
+        data = dataset.to_pandas().iloc[:1000]
+        
+        # Function to embed a single text
+        def embed_single_text(text):
+            return embedder._embed([text])[0]
 
-        return final_chunks
+        # Function to embed texts with multiprocessing
+        def embed_texts(texts):
+            with Pool(cpu_count()) as pool:
+                embeddings = list(tqdm(pool.imap(embed_single_text, texts), total=len(texts), desc="Embedding texts"))
+            return embeddings
+
+        # create embeddings
+        data['embeddings'] = embed_texts(data['content'].tolist())
+
+        return data
 
 # calling the main function
-main_class = main(input_variables)
+main_class = create_embedding(input_variables)
 
-# loading the dataset
-dataset = main_class.load_documents()
+# create embeddings
+data = main_class.create_embeddings()
 
-print(dataset)
+print(data.head(1))
