@@ -3,6 +3,7 @@ import argparse
 import os, shutil
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
+from concurrent.futures import ThreadPoolExecutor, as_completed
 # from langchain.document_loaders.pdf import PyPDFDirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_experimental.text_splitter import SemanticChunker
@@ -10,13 +11,6 @@ from langchain.schema.document import Document
 from langchain_community.vectorstores import Chroma
 from config import input_variables
 from datasets import load_dataset
-
-class Embedder:
-    def __init__(self, input_variables):
-        self.embedder = OllamaEmbeddings(model=input_variables.variables.EMBEDDING_MODEL)
-
-    def embed_single_text(self, text):
-        return self.embedder._embed([text])[0]
 
 class create_embedding:
     def __init__(self,input_variables) -> None:
@@ -35,7 +29,18 @@ class create_embedding:
     def load_documents(self):
         dataset = load_dataset(self.DATASET_URL, split="train")
         return dataset
-    
+
+    def embed_single_text(self, embedder, text):
+        return embedder._embed([text])[0]
+
+    def embed_texts(self, embedder, texts):
+        embeddings = []
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(self.embed_single_text, embedder, text): text for text in texts}
+            for future in tqdm(as_completed(futures), total=len(texts), desc="Embedding texts"):
+                embeddings.append(future.result())
+        return embeddings    
+
     def create_embeddings(self):
         # Initialize the embedder
         embedder = self.get_embedding_function()
@@ -45,26 +50,16 @@ class create_embedding:
 
         # Convert dataset to pandas dataframe
         data = dataset.to_pandas().iloc[:1000]
-        
-        # Function to embed a single text
-        def embed_single_text(text):
-            return embedder._embed([text])[0]
 
-        # Function to embed texts with multiprocessing
-        def embed_texts(texts):
-            with Pool(cpu_count()) as pool:
-                embeddings = list(tqdm(pool.imap(embed_single_text, texts), total=len(texts), desc="Embedding texts"))
-            return embeddings
-
-        # create embeddings
-        data['embeddings'] = embed_texts(data['content'].tolist())
+        # create embeddings with multithreading
+        data['embeddings'] = self.embed_texts(embedder, data['content'].tolist())
 
         return data
 
-# calling the main function
-main_class = create_embedding(input_variables)
+# # calling the main function
+# main_class = create_embedding(input_variables)
 
-# create embeddings
-data = main_class.create_embeddings()
+# # create embeddings
+# data = main_class.create_embeddings()
 
-print(data.head(1))
+# print(data.head(1))
