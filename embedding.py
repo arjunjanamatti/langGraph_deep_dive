@@ -1,14 +1,6 @@
 from langchain_community.embeddings.ollama import OllamaEmbeddings
-import argparse
-import os, shutil
 from tqdm import tqdm
-from multiprocessing import Pool, cpu_count
 from concurrent.futures import ThreadPoolExecutor, as_completed
-# from langchain.document_loaders.pdf import PyPDFDirectoryLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_experimental.text_splitter import SemanticChunker
-from langchain.schema.document import Document
-from langchain_community.vectorstores import Chroma
 from config import input_variables
 from datasets import load_dataset
 
